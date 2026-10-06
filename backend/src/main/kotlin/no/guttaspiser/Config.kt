@@ -6,7 +6,6 @@ data class Config(
     val port: Int,
     val supabaseUrl: String,
     val supabaseKey: String,
-    val allowedOrigins: List<String>,
 ) {
     companion object {
         /**
@@ -24,8 +23,6 @@ data class Config(
                 port = get("PORT")?.toInt() ?: 8080,
                 supabaseUrl = require("SUPABASE_URL").trimEnd('/'),
                 supabaseKey = require("SUPABASE_SECRET_KEY"),
-                allowedOrigins = (get("ALLOWED_ORIGINS") ?: "http://localhost:8731")
-                    .split(",").map { it.trim() }.filter { it.isNotEmpty() },
             )
         }
 

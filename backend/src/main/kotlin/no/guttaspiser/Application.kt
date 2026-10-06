@@ -1,7 +1,5 @@
 package no.guttaspiser
 
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -10,7 +8,6 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -23,19 +20,14 @@ import io.ktor.server.routing.routing
 fun main() {
     val config = Config.fromEnv()
     embeddedServer(Netty, port = config.port) {
-        module(SupabaseReviewRepository(config.supabaseUrl, config.supabaseKey), config.allowedOrigins)
+        module(SupabaseReviewRepository(config.supabaseUrl, config.supabaseKey))
     }.start(wait = true)
 }
 
-fun Application.module(repository: ReviewRepository, allowedOrigins: List<String>) {
+fun Application.module(repository: ReviewRepository) {
     install(ContentNegotiation) { json() }
 
-    install(CORS) {
-        allowedOrigins.forEach { allowHost(it.substringAfter("://"), schemes = listOf(it.substringBefore("://"))) }
-        allowMethod(HttpMethod.Post)
-        allowMethod(HttpMethod.Delete)
-        allowHeader(HttpHeaders.ContentType)
-    }
+    // Ingen CORS: frontenden når backenden på samme domene (Vite-proxy lokalt, Vercel-rewrite i prod)
 
     install(StatusPages) {
         exception<BadRequestException> { call, cause ->

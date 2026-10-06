@@ -36,7 +36,7 @@ class ApplicationTest {
             )
         }
         testApplication {
-            application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine), emptyList()) }
+            application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine)) }
             val res = client.post("/api/reviews") {
                 contentType(ContentType.Application.Json)
                 setBody("""{"sted":"Peppes","navn":"Ahmed","kommentar":"bra","rank":2}""")
@@ -57,7 +57,7 @@ class ApplicationTest {
             )
         }
         testApplication {
-            application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine), emptyList()) }
+            application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine)) }
             val res = client.get("/api/reviews")
             assertEquals(HttpStatusCode.OK, res.status)
             assertTrue(res.bodyAsText().contains("Peppes"))
@@ -68,7 +68,7 @@ class ApplicationTest {
     fun `sletting gir 404 hvis review ikke finnes`() {
         val engine = MockEngine { respond("false", HttpStatusCode.OK, jsonHeaders) }
         testApplication {
-            application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine), emptyList()) }
+            application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine)) }
             assertEquals(HttpStatusCode.NotFound, client.delete("/api/reviews/42").status)
         }
     }
@@ -81,7 +81,7 @@ class ApplicationTest {
             override suspend fun delete(id: Long) = false
         }
         testApplication {
-            application { module(repo, emptyList()) }
+            application { module(repo) }
             val res = client.post("/api/reviews") {
                 contentType(ContentType.Application.Json)
                 setBody("""{"sted":"Peppes","navn":"Ahmed","rank":-1}""")
