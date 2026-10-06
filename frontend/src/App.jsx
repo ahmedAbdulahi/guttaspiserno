@@ -3,28 +3,36 @@ import MouseTrail from "./MouseTrail.jsx";
 
 const STORAGE_KEY = "gutta-spiser-no-ratings";
 
-function loadRatings() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw ? JSON.parse(raw) : [];
+function sameNavn(a, b) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
-function StarPicker({ value, onChange }) {
-  return (
-    <div className="stars">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <span
-          key={n}
-          className={n <= value ? "active" : ""}
-          onClick={() => onChange(n)}
-        >
-          ★
-        </span>
-      ))}
-    </div>
+function loadRatings() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const parsed = raw ? JSON.parse(raw) : [];
+  const rankCounters = {};
+
+  return parsed.map((r) => {
+    if (typeof r.rank === "number") return r;
+    const key = r.navn.trim().toLowerCase();
+    const rank = rankCounters[key] ?? 0;
+    rankCounters[key] = rank + 1;
+    const { stjerner, ...rest } = r;
+    return { ...rest, rank };
+  });
+}
+
+function renumberPerson(ratings, navn) {
+  const sorted = ratings
+    .filter((r) => sameNavn(r.navn, navn))
+    .sort((a, b) => a.rank - b.rank);
+  const rankById = new Map(sorted.map((r, i) => [r.id, i]));
+  return ratings.map((r) =>
+    sameNavn(r.navn, navn) ? { ...r, rank: rankById.get(r.id) } : r
   );
 }
 
-function RatingCard({ rating, onDelete }) {
+function RatingCard({ rating, position, onDelete }) {
   const date = new Date(rating.date).toLocaleDateString("no-NO", {
     day: "numeric",
     month: "short",
@@ -37,15 +45,10 @@ function RatingCard({ rating, onDelete }) {
         ✕
       </button>
       <div className="rating-card-top">
+        <span className="rating-rank">#{position}</span>
         <span className="rating-sted">{rating.sted}</span>
-        <span className="rating-stars">
-          {"★".repeat(rating.stjerner)}
-          {"☆".repeat(5 - rating.stjerner)}
-        </span>
       </div>
-      <div className="rating-meta">
-        {rating.navn} · {date}
-      </div>
+      <div className="rating-meta">{date}</div>
       {rating.kommentar && <div className="rating-kommentar">{rating.kommentar}</div>}
     </div>
   );
@@ -55,9 +58,9 @@ export default function App() {
   const [ratings, setRatings] = useState(loadRatings);
   const [sted, setSted] = useState("");
   const [navn, setNavn] = useState("");
-  const [stjerner, setStjerner] = useState(0);
   const [kommentar, setKommentar] = useState("");
   const [heroVisible, setHeroVisible] = useState(true);
+  const [comparison, setComparison] = useState(null);
   const heroRef = useRef(null);
 
   useEffect(() => {
@@ -76,34 +79,76 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    if (stjerner === 0) {
-      alert("Velg antall stjerner!");
-      return;
-    }
-
-    setRatings([
-      ...ratings,
-      {
-        id: Date.now(),
-        sted: sted.trim(),
-        navn: navn.trim(),
-        stjerner,
-        kommentar: kommentar.trim(),
-        date: new Date().toISOString(),
-      },
-    ]);
-
+  function resetForm() {
     setSted("");
     setNavn("");
-    setStjerner(0);
     setKommentar("");
   }
 
-  function handleDelete(id) {
-    setRatings(ratings.filter((r) => r.id !== id));
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    const entry = { sted: sted.trim(), navn: navn.trim(), kommentar: kommentar.trim() };
+    const personRatings = ratings
+      .filter((r) => sameNavn(r.navn, entry.navn))
+      .sort((a, b) => a.rank - b.rank);
+
+    if (personRatings.length === 0) {
+      setRatings([
+        ...ratings,
+        { ...entry, id: Date.now(), rank: 0, date: new Date().toISOString() },
+      ]);
+      resetForm();
+      return;
+    }
+
+    setComparison({ entry, list: personRatings, lo: 0, hi: personRatings.length });
   }
+
+  function handleCompare(newIsBetter) {
+    const { entry, list, lo, hi } = comparison;
+    const mid = Math.floor((lo + hi) / 2);
+    const nextLo = newIsBetter ? lo : mid + 1;
+    const nextHi = newIsBetter ? mid : hi;
+
+    if (nextLo >= nextHi) {
+      const insertIndex = nextLo;
+      const newRating = {
+        ...entry,
+        id: Date.now(),
+        rank: insertIndex,
+        date: new Date().toISOString(),
+      };
+      const shifted = ratings.map((r) =>
+        sameNavn(r.navn, entry.navn) && r.rank >= insertIndex
+          ? { ...r, rank: r.rank + 1 }
+          : r
+      );
+      setRatings([...shifted, newRating]);
+      setComparison(null);
+      resetForm();
+      return;
+    }
+
+    setComparison({ entry, list, lo: nextLo, hi: nextHi });
+  }
+
+  function handleDelete(id) {
+    const deleted = ratings.find((r) => r.id === id);
+    const remaining = ratings.filter((r) => r.id !== id);
+    setRatings(deleted ? renumberPerson(remaining, deleted.navn) : remaining);
+  }
+
+  const grouped = {};
+  for (const r of ratings) {
+    if (!grouped[r.navn]) grouped[r.navn] = [];
+    grouped[r.navn].push(r);
+  }
+
+  const compareMid = comparison
+    ? Math.floor((comparison.lo + comparison.hi) / 2)
+    : null;
+  const compareCandidate = comparison ? comparison.list[compareMid] : null;
 
   return (
     <>
@@ -118,41 +163,67 @@ export default function App() {
       <section className="content">
         <div className="container">
           <h2>Legg til rating</h2>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              placeholder="Hvor spiste dere?"
-              value={sted}
-              onChange={(e) => setSted(e.target.value)}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Hvem rater?"
-              value={navn}
-              onChange={(e) => setNavn(e.target.value)}
-              required
-            />
-            <StarPicker value={stjerner} onChange={setStjerner} />
-            <textarea
-              placeholder="Kommentar (valgfritt)"
-              value={kommentar}
-              onChange={(e) => setKommentar(e.target.value)}
-            />
-            <button type="submit">Legg til</button>
-          </form>
+
+          {comparison ? (
+            <div className="compare-box">
+              <p className="compare-question">
+                Hva var best, ifølge {comparison.entry.navn}?
+              </p>
+              <div className="compare-options">
+                <button type="button" onClick={() => handleCompare(true)}>
+                  {comparison.entry.sted}
+                </button>
+                <button type="button" onClick={() => handleCompare(false)}>
+                  {compareCandidate.sted}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <input
+                type="text"
+                placeholder="Hvor spiste dere?"
+                value={sted}
+                onChange={(e) => setSted(e.target.value)}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Hvem rater?"
+                value={navn}
+                onChange={(e) => setNavn(e.target.value)}
+                required
+              />
+              <textarea
+                placeholder="Kommentar (valgfritt)"
+                value={kommentar}
+                onChange={(e) => setKommentar(e.target.value)}
+              />
+              <button type="submit">Legg til</button>
+            </form>
+          )}
 
           <h2>Ratings</h2>
           <div className="rating-list">
-            {ratings.length === 0 ? (
+            {Object.keys(grouped).length === 0 ? (
               <p className="empty-state">Ingen ratings enda. Bli den første!</p>
             ) : (
-              ratings
-                .slice()
-                .reverse()
-                .map((rating) => (
-                  <RatingCard key={rating.id} rating={rating} onDelete={handleDelete} />
-                ))
+              Object.entries(grouped).map(([personNavn, personRatings]) => (
+                <div key={personNavn} className="person-group">
+                  <h3 className="person-name">{personNavn}</h3>
+                  {personRatings
+                    .slice()
+                    .sort((a, b) => a.rank - b.rank)
+                    .map((rating) => (
+                      <RatingCard
+                        key={rating.id}
+                        rating={rating}
+                        position={rating.rank + 1}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                </div>
+              ))
             )}
           </div>
         </div>

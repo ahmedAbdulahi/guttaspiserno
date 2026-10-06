@@ -100,7 +100,7 @@ input, textarea {
 }
 
 input:focus, textarea:focus {
-  border-color: #ff6b35;
+  border-color: #141414;
 }
 
 textarea {
@@ -108,28 +108,8 @@ textarea {
   min-height: 70px;
 }
 
-.stars {
-  font-size: 2rem;
-  display: flex;
-  gap: 0.3rem;
-  cursor: pointer;
-}
-
-.stars span {
-  color: #d9d9d9;
-  transition: color 0.15s ease, transform 0.15s ease;
-}
-
-.stars span.active {
-  color: #ffb627;
-}
-
-.stars span:hover {
-  transform: scale(1.15);
-}
-
 button {
-  background: #ff6b35;
+  background: #141414;
   color: #fff;
   border: none;
   padding: 0.9rem;
@@ -141,7 +121,41 @@ button {
 }
 
 button:hover {
-  background: #e85a2a;
+  background: #000000;
+}
+
+.compare-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.compare-question {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.compare-options {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.compare-options button {
+  flex: 1;
+  background: #ffffff;
+  color: #141414;
+  border: 2px solid #141414;
+  padding: 1.2rem 1rem;
+}
+
+.compare-options button:hover {
+  background: #141414;
+  color: #ffffff;
 }
 
 .rating-list {
@@ -165,10 +179,13 @@ button:hover {
 
 .rating-card-top {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.rating-rank {
+  font-weight: 800;
+  opacity: 0.4;
 }
 
 .rating-sted {
@@ -176,9 +193,21 @@ button:hover {
   font-size: 1.1rem;
 }
 
-.rating-stars {
-  color: #ffb627;
-  letter-spacing: 0.1rem;
+.person-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.person-group:last-child {
+  margin-bottom: 0;
+}
+
+.person-name {
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0.6;
 }
 
 .rating-meta {
@@ -207,6 +236,6 @@ button:hover {
 }
 
 .delete-btn:hover {
-  color: #ff6b35;
+  color: #141414;
   background: none;
 }
