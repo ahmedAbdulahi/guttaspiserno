@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import MouseTrail from "./MouseTrail.jsx";
 
 const STORAGE_KEY = "gutta-spiser-no-ratings";
 
@@ -56,10 +57,24 @@ export default function App() {
   const [navn, setNavn] = useState("");
   const [stjerner, setStjerner] = useState(0);
   const [kommentar, setKommentar] = useState("");
+  const [heroVisible, setHeroVisible] = useState(true);
+  const heroRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
   }, [ratings]);
+
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeroVisible(entry.isIntersecting),
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -92,11 +107,11 @@ export default function App() {
 
   return (
     <>
-      <section className="hero">
+      <MouseTrail active={heroVisible} />
+
+      <section className="hero" ref={heroRef}>
         <div className="hero-content">
           <h1>GUTTA SPISER NO</h1>
-          <p className="hero-sub">bla ned for å rate</p>
-          <div className="scroll-arrow">↓</div>
         </div>
       </section>
 

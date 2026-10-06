@@ -1,0 +1,21 @@
+.mouse-trail {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.mouse-trail-item {
+  position: fixed;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.mouse-trail-img {
+  display: block;
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
