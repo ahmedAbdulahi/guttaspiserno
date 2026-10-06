@@ -32,7 +32,7 @@ class ApplicationTest {
         }
         testApplication {
             application { module(SupabaseReviewRepository("https://x.supabase.co", "key", engine), listOf("http://localhost:8731")) }
-            val res = client.post("/reviews") {
+            val res = client.post("/api/reviews") {
                 contentType(ContentType.Application.Json)
                 setBody("""{"sted":" Peppes ","navn":"Ahmed","stjerner":4,"kommentar":"bra"}""")
             }
@@ -49,7 +49,7 @@ class ApplicationTest {
         }
         testApplication {
             application { module(repo, emptyList()) }
-            val res = client.post("/reviews") {
+            val res = client.post("/api/reviews") {
                 contentType(ContentType.Application.Json)
                 setBody("""{"sted":"Peppes","navn":"Ahmed","stjerner":7}""")
             }

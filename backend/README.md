@@ -19,7 +19,7 @@ Secret key omgår RLS, så den skal kun ligge i backend – aldri i frontend ell
 
 ## API
 
-`POST /reviews`
+`POST /api/reviews`
 
 ```json
 { "sted": "Peppes", "navn": "Ahmed", "stjerner": 4, "kommentar": "Bra pizza" }
@@ -28,4 +28,10 @@ Secret key omgår RLS, så den skal kun ligge i backend – aldri i frontend ell
 Svarer `201 Created` med den lagrede raden (inkl. `id` og `created_at`).
 `400` hvis felter mangler eller `stjerner` ikke er 1–5.
 
-`GET /health` → `{ "status": "ok" }`
+`GET /api/health` → `{ "status": "ok" }`
+
+## Deploy (Vercel)
+
+Backenden kjører som en container-tjeneste på Vercel (`Dockerfile.vercel`), definert i `vercel.json` i rotmappen.
+Vercel ruter `/api/*` hit og alt annet til frontenden. Sett `SUPABASE_URL` og `SUPABASE_SECRET_KEY`
+som Environment Variables i Vercel-prosjektet.

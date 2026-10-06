@@ -1,0 +1,14 @@
+# Bygg
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /app
+COPY . .
+RUN chmod +x gradlew && ./gradlew installDist --no-daemon -q
+
+# Kjør
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/build/install/guttaspiserno-backend /app
+# Vercel sender trafikk til port 80 med mindre PORT er satt i prosjektet
+ENV PORT=80
+EXPOSE 80
+CMD ["/app/bin/guttaspiserno-backend"]

@@ -16,6 +16,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
 fun main() {
@@ -48,13 +49,16 @@ fun Application.module(repository: ReviewRepository, allowedOrigins: List<String
     }
 
     routing {
-        get("/health") { call.respond(mapOf("status" to "ok")) }
+        // Alt ligger under /api, slik at Vercel kan rute /api/* hit og resten til frontenden
+        route("/api") {
+            get("/health") { call.respond(mapOf("status" to "ok")) }
 
-        post("/reviews") {
-            val request = call.receive<ReviewRequest>()
-            request.validate()
-            val saved = repository.save(request)
-            call.respond(HttpStatusCode.Created, saved)
+            post("/reviews") {
+                val request = call.receive<ReviewRequest>()
+                request.validate()
+                val saved = repository.save(request)
+                call.respond(HttpStatusCode.Created, saved)
+            }
         }
     }
 }
