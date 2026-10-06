@@ -1,0 +1,60 @@
+package no.guttaspiser
+
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+
+fun main() {
+    val config = Config.fromEnv()
+    embeddedServer(Netty, port = config.port) {
+        module(SupabaseReviewRepository(config.supabaseUrl, config.supabaseKey), config.allowedOrigins)
+    }.start(wait = true)
+}
+
+fun Application.module(repository: ReviewRepository, allowedOrigins: List<String>) {
+    install(ContentNegotiation) { json() }
+
+    install(CORS) {
+        allowedOrigins.forEach { allowHost(it.substringAfter("://"), schemes = listOf(it.substringBefore("://"))) }
+        allowMethod(HttpMethod.Post)
+        allowHeader(HttpHeaders.ContentType)
+    }
+
+    install(StatusPages) {
+        exception<BadRequestException> { call, cause ->
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Ugyldig request")))
+        }
+        exception<IllegalArgumentException> { call, cause ->
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Ugyldig request")))
+        }
+        exception<Throwable> { call, cause ->
+            call.application.environment.log.error("Uventet feil", cause)
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Noe gikk galt"))
+        }
+    }
+
+    routing {
+        get("/health") { call.respond(mapOf("status" to "ok")) }
+
+        post("/reviews") {
+            val request = call.receive<ReviewRequest>()
+            request.validate()
+            val saved = repository.save(request)
+            call.respond(HttpStatusCode.Created, saved)
+        }
+    }
+}
