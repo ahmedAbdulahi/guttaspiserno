@@ -1,35 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import MouseTrail from "./MouseTrail.jsx";
-
-const STORAGE_KEY = "gutta-spiser-no-ratings";
+import { createReview, deleteReview, fetchReviews } from "./api.js";
 
 function sameNavn(a, b) {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
-}
-
-function loadRatings() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  const parsed = raw ? JSON.parse(raw) : [];
-  const rankCounters = {};
-
-  return parsed.map((r) => {
-    if (typeof r.rank === "number") return r;
-    const key = r.navn.trim().toLowerCase();
-    const rank = rankCounters[key] ?? 0;
-    rankCounters[key] = rank + 1;
-    const { stjerner, ...rest } = r;
-    return { ...rest, rank };
-  });
-}
-
-function renumberPerson(ratings, navn) {
-  const sorted = ratings
-    .filter((r) => sameNavn(r.navn, navn))
-    .sort((a, b) => a.rank - b.rank);
-  const rankById = new Map(sorted.map((r, i) => [r.id, i]));
-  return ratings.map((r) =>
-    sameNavn(r.navn, navn) ? { ...r, rank: rankById.get(r.id) } : r
-  );
 }
 
 function RatingCard({ rating, position, onDelete }) {
@@ -55,7 +29,10 @@ function RatingCard({ rating, position, onDelete }) {
 }
 
 export default function App() {
-  const [ratings, setRatings] = useState(loadRatings);
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const [sted, setSted] = useState("");
   const [navn, setNavn] = useState("");
   const [kommentar, setKommentar] = useState("");
@@ -63,9 +40,35 @@ export default function App() {
   const [comparison, setComparison] = useState(null);
   const heroRef = useRef(null);
 
+  async function reload() {
+    try {
+      setRatings(await fetchReviews());
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
-  }, [ratings]);
+    reload();
+  }, []);
+
+  // Lagrer på serveren (som flytter de andre stedene til personen ned) og henter lista på nytt
+  async function save(entry, rank) {
+    setSaving(true);
+    try {
+      await createReview({ ...entry, rank });
+      setComparison(null);
+      resetForm();
+      await reload();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     const el = heroRef.current;
@@ -85,7 +88,7 @@ export default function App() {
     setKommentar("");
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     const entry = { sted: sted.trim(), navn: navn.trim(), kommentar: kommentar.trim() };
@@ -94,49 +97,34 @@ export default function App() {
       .sort((a, b) => a.rank - b.rank);
 
     if (personRatings.length === 0) {
-      setRatings([
-        ...ratings,
-        { ...entry, id: Date.now(), rank: 0, date: new Date().toISOString() },
-      ]);
-      resetForm();
+      await save(entry, 0);
       return;
     }
 
     setComparison({ entry, list: personRatings, lo: 0, hi: personRatings.length });
   }
 
-  function handleCompare(newIsBetter) {
+  async function handleCompare(newIsBetter) {
     const { entry, list, lo, hi } = comparison;
     const mid = Math.floor((lo + hi) / 2);
     const nextLo = newIsBetter ? lo : mid + 1;
     const nextHi = newIsBetter ? mid : hi;
 
     if (nextLo >= nextHi) {
-      const insertIndex = nextLo;
-      const newRating = {
-        ...entry,
-        id: Date.now(),
-        rank: insertIndex,
-        date: new Date().toISOString(),
-      };
-      const shifted = ratings.map((r) =>
-        sameNavn(r.navn, entry.navn) && r.rank >= insertIndex
-          ? { ...r, rank: r.rank + 1 }
-          : r
-      );
-      setRatings([...shifted, newRating]);
-      setComparison(null);
-      resetForm();
+      await save(entry, nextLo);
       return;
     }
 
     setComparison({ entry, list, lo: nextLo, hi: nextHi });
   }
 
-  function handleDelete(id) {
-    const deleted = ratings.find((r) => r.id === id);
-    const remaining = ratings.filter((r) => r.id !== id);
-    setRatings(deleted ? renumberPerson(remaining, deleted.navn) : remaining);
+  async function handleDelete(id) {
+    try {
+      await deleteReview(id);
+      await reload();
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   const grouped = {};
@@ -170,10 +158,10 @@ export default function App() {
                 Hva var best, ifølge {comparison.entry.navn}?
               </p>
               <div className="compare-options">
-                <button type="button" onClick={() => handleCompare(true)}>
+                <button type="button" disabled={saving} onClick={() => handleCompare(true)}>
                   {comparison.entry.sted}
                 </button>
-                <button type="button" onClick={() => handleCompare(false)}>
+                <button type="button" disabled={saving} onClick={() => handleCompare(false)}>
                   {compareCandidate.sted}
                 </button>
               </div>
@@ -199,13 +187,19 @@ export default function App() {
                 value={kommentar}
                 onChange={(e) => setKommentar(e.target.value)}
               />
-              <button type="submit">Legg til</button>
+              <button type="submit" disabled={saving}>
+                {saving ? "Lagrer..." : "Legg til"}
+              </button>
             </form>
           )}
 
+          {error && <p className="error-message">{error}</p>}
+
           <h2>Ratings</h2>
           <div className="rating-list">
-            {Object.keys(grouped).length === 0 ? (
+            {loading ? (
+              <p className="empty-state">Henter ratings...</p>
+            ) : Object.keys(grouped).length === 0 ? (
               <p className="empty-state">Ingen ratings enda. Bli den første!</p>
             ) : (
               Object.entries(grouped).map(([personNavn, personRatings]) => (

@@ -169,6 +169,16 @@ button:hover {
   font-style: italic;
 }
 
+.error-message {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .rating-card {
   background: #ffffff;
   border: 1px solid #e0e0e0;

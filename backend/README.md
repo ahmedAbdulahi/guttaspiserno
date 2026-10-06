@@ -4,7 +4,7 @@ Kotlin/Ktor-backend som tar imot reviews og lagrer dem i Supabase.
 
 ## Oppsett
 
-1. Kjør `supabase.sql` i Supabase → SQL Editor (lager tabellen `reviews`).
+1. Kjør `supabase.sql` og deretter `supabase_002_ranking.sql` i Supabase (tabellen `reviews` og funksjonene for rangering).
 2. Hent URL og secret key (`sb_secret_...`) fra Supabase → Project Settings → API Keys.
 3. Lag `backend/.env` (se `.env.example`) – den leses automatisk ved oppstart. Alternativt kan du eksportere variablene:
 
@@ -19,16 +19,18 @@ Secret key omgår RLS, så den skal kun ligge i backend – aldri i frontend ell
 
 ## API
 
-`POST /api/reviews`
+Rangering er per person: `rank` 0 er personens beste sted.
 
-```json
-{ "sted": "Peppes", "navn": "Ahmed", "stjerner": 4, "kommentar": "Bra pizza" }
-```
+- `GET /api/reviews` – alle reviews, sortert på navn og rank
+- `POST /api/reviews` – legg inn en review på en gitt plass. De andre stedene til personen flyttes ned.
 
-Svarer `201 Created` med den lagrede raden (inkl. `id` og `created_at`).
-`400` hvis felter mangler eller `stjerner` ikke er 1–5.
+  ```json
+  { "sted": "Peppes", "navn": "Ahmed", "kommentar": "Bra pizza", "rank": 0 }
+  ```
 
-`GET /api/health` → `{ "status": "ok" }`
+  Svarer `201 Created` med den lagrede raden.
+- `DELETE /api/reviews/{id}` – sletter og tetter hullet i rangeringen. `204`, eller `404` hvis den ikke finnes.
+- `GET /api/health` → `{ "status": "ok" }`
 
 ## Deploy (Vercel)
 

@@ -14,6 +14,7 @@ import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
@@ -32,6 +33,7 @@ fun Application.module(repository: ReviewRepository, allowedOrigins: List<String
     install(CORS) {
         allowedOrigins.forEach { allowHost(it.substringAfter("://"), schemes = listOf(it.substringBefore("://"))) }
         allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Delete)
         allowHeader(HttpHeaders.ContentType)
     }
 
@@ -53,11 +55,25 @@ fun Application.module(repository: ReviewRepository, allowedOrigins: List<String
         route("/api") {
             get("/health") { call.respond(mapOf("status" to "ok")) }
 
+            get("/reviews") {
+                call.respond(repository.list())
+            }
+
             post("/reviews") {
                 val request = call.receive<ReviewRequest>()
                 request.validate()
                 val saved = repository.save(request)
                 call.respond(HttpStatusCode.Created, saved)
+            }
+
+            delete("/reviews/{id}") {
+                val id = call.parameters["id"]?.toLongOrNull()
+                    ?: throw IllegalArgumentException("id må være et tall")
+                if (repository.delete(id)) {
+                    call.respond(HttpStatusCode.NoContent)
+                } else {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Fant ikke review $id"))
+                }
             }
         }
     }
