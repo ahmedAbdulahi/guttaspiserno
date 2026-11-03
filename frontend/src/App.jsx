@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import MouseTrail from "./MouseTrail.jsx";
-import { createReview, deleteReview, fetchReviews } from "./api.js";
+import {
+  createReview,
+  deleteReview,
+  erLåstOpp,
+  fetchReviews,
+  lås,
+  låsOpp,
+} from "./api.js";
 
-function sameNavn(a, b) {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
-}
-
-function RatingCard({ rating, position, onDelete }) {
+function RatingCard({ rating, position, onDelete, kanSlette }) {
   const date = new Date(rating.date).toLocaleDateString("no-NO", {
     day: "numeric",
     month: "short",
@@ -15,9 +18,15 @@ function RatingCard({ rating, position, onDelete }) {
 
   return (
     <div className="rating-card">
-      <button className="delete-btn" aria-label="Slett" onClick={() => onDelete(rating.id)}>
-        ✕
-      </button>
+      {kanSlette && (
+        <button
+          className="delete-btn"
+          aria-label={`Slett ${rating.sted}`}
+          onClick={() => onDelete(rating)}
+        >
+          ✕
+        </button>
+      )}
       <div className="rating-card-top">
         <span className="rating-rank">#{position}</span>
         <span className="rating-sted">{rating.sted}</span>
@@ -28,16 +37,98 @@ function RatingCard({ rating, position, onDelete }) {
   );
 }
 
+
+function SlettDialog({ rating, onBekreft, onAvbryt, sletter }) {
+  const avbrytRef = useRef(null);
+
+  useEffect(() => {
+    avbrytRef.current?.focus();
+    function onKey(e) {
+      if (e.key === "Escape") onAvbryt();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onAvbryt]);
+
+  return (
+    <div className="dialog-bakgrunn" onClick={onAvbryt}>
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="slett-tittel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p id="slett-tittel" className="dialog-tittel">
+          Slette «{rating.sted}»?
+        </p>
+        <p className="dialog-tekst">
+          Stedet forsvinner fra rangeringen, og de under rykker opp. Dette kan
+          ikke angres.
+        </p>
+        <div className="dialog-knapper">
+          <button type="button" ref={avbrytRef} className="dialog-avbryt" onClick={onAvbryt}>
+            Avbryt
+          </button>
+          <button type="button" className="dialog-slett" onClick={onBekreft} disabled={sletter}>
+            {sletter ? "Sletter..." : "Slett"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Passordport({ onLåstOpp }) {
+  const [passord, setPassord] = useState("");
+  const [sjekker, setSjekker] = useState(false);
+  const [feil, setFeil] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSjekker(true);
+    setFeil(null);
+    try {
+      await låsOpp(passord);
+      setPassord("");
+      onLåstOpp();
+    } catch (err) {
+      setFeil(err.message);
+    } finally {
+      setSjekker(false);
+    }
+  }
+
+  return (
+    <form className="passordport" onSubmit={handleSubmit}>
+      <input
+        type="password"
+        placeholder="Passord"
+        value={passord}
+        onChange={(e) => setPassord(e.target.value)}
+        autoComplete="current-password"
+        required
+      />
+      <button type="submit" disabled={sjekker || !passord}>
+        {sjekker ? "Sjekker..." : "Lås opp"}
+      </button>
+      {feil && <p className="error-message">{feil}</p>}
+    </form>
+  );
+}
+
 export default function App() {
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [sted, setSted] = useState("");
-  const [navn, setNavn] = useState("");
   const [kommentar, setKommentar] = useState("");
   const [heroVisible, setHeroVisible] = useState(true);
   const [comparison, setComparison] = useState(null);
+  const [låstOpp, setLåstOpp] = useState(erLåstOpp);
+  const [slettKandidat, setSlettKandidat] = useState(null);
+  const [sletter, setSletter] = useState(false);
   const heroRef = useRef(null);
 
   async function reload() {
@@ -55,7 +146,7 @@ export default function App() {
     reload();
   }, []);
 
-  // Lagrer på serveren (som flytter de andre stedene til personen ned) og henter lista på nytt
+  // Lagrer på serveren (som flytter stedene under ned) og henter lista på nytt
   async function save(entry, rank) {
     setSaving(true);
     try {
@@ -65,6 +156,11 @@ export default function App() {
       await reload();
     } catch (err) {
       setError(err.message);
+      // Tilbake til skjemaet med teksten i behold – ellers blir man stående
+      // og får samme sammenligningsspørsmål om igjen
+      setComparison(null);
+      // Databasen kan ha avvist et utdatert passord, og da er appen låst igjen
+      setLåstOpp(erLåstOpp());
     } finally {
       setSaving(false);
     }
@@ -84,24 +180,21 @@ export default function App() {
 
   function resetForm() {
     setSted("");
-    setNavn("");
     setKommentar("");
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const entry = { sted: sted.trim(), navn: navn.trim(), kommentar: kommentar.trim() };
-    const personRatings = ratings
-      .filter((r) => sameNavn(r.navn, entry.navn))
-      .sort((a, b) => a.rank - b.rank);
+    const entry = { sted: sted.trim(), kommentar: kommentar.trim() };
+    const sortert = [...ratings].sort((a, b) => a.rank - b.rank);
 
-    if (personRatings.length === 0) {
+    if (sortert.length === 0) {
       await save(entry, 0);
       return;
     }
 
-    setComparison({ entry, list: personRatings, lo: 0, hi: personRatings.length });
+    setComparison({ entry, list: sortert, lo: 0, hi: sortert.length });
   }
 
   async function handleCompare(newIsBetter) {
@@ -118,19 +211,26 @@ export default function App() {
     setComparison({ entry, list, lo: nextLo, hi: nextHi });
   }
 
-  async function handleDelete(id) {
+  function handleLås() {
+    setComparison(null);
+    setError(null);
+    lås();
+    setLåstOpp(false);
+  }
+
+  async function bekreftSletting() {
+    setSletter(true);
     try {
-      await deleteReview(id);
+      await deleteReview(slettKandidat.id);
+      setSlettKandidat(null);
       await reload();
     } catch (err) {
       setError(err.message);
+      setSlettKandidat(null);
+      setLåstOpp(erLåstOpp());
+    } finally {
+      setSletter(false);
     }
-  }
-
-  const grouped = {};
-  for (const r of ratings) {
-    if (!grouped[r.navn]) grouped[r.navn] = [];
-    grouped[r.navn].push(r);
   }
 
   const compareMid = comparison
@@ -142,6 +242,15 @@ export default function App() {
     <>
       <MouseTrail active={heroVisible} />
 
+      {slettKandidat && (
+        <SlettDialog
+          rating={slettKandidat}
+          sletter={sletter}
+          onBekreft={bekreftSletting}
+          onAvbryt={() => setSlettKandidat(null)}
+        />
+      )}
+
       <section className="hero" ref={heroRef}>
         <div className="hero-content">
           <h1>GUTTA SPISER NO</h1>
@@ -150,12 +259,42 @@ export default function App() {
 
       <section className="content">
         <div className="container">
-          <h2>Legg til rating</h2>
+          <h2>Ratings</h2>
+          <div className="rating-list">
+            {loading ? (
+              <p className="empty-state">Henter ratings...</p>
+            ) : ratings.length === 0 ? (
+              <p className="empty-state">Ingen ratings enda. Bli den første!</p>
+            ) : (
+              [...ratings]
+                .sort((a, b) => a.rank - b.rank)
+                .map((rating) => (
+                  <RatingCard
+                    key={rating.id}
+                    rating={rating}
+                    position={rating.rank + 1}
+                    onDelete={setSlettKandidat}
+                    kanSlette={låstOpp}
+                  />
+                ))
+            )}
+          </div>
 
-          {comparison ? (
+          <div className="section-header">
+            <h2>Legg til rating</h2>
+            {låstOpp && (
+              <button type="button" className="lock-btn" onClick={handleLås}>
+                Lås
+              </button>
+            )}
+          </div>
+
+          {!låstOpp ? (
+            <Passordport onLåstOpp={() => setLåstOpp(true)} />
+          ) : comparison ? (
             <div className="compare-box">
               <p className="compare-question">
-                Hva var best, ifølge {comparison.entry.navn}?
+                Hva var best?
               </p>
               <div className="compare-options">
                 <button type="button" disabled={saving} onClick={() => handleCompare(true)}>
@@ -175,51 +314,18 @@ export default function App() {
                 onChange={(e) => setSted(e.target.value)}
                 required
               />
-              <input
-                type="text"
-                placeholder="Hvem rater?"
-                value={navn}
-                onChange={(e) => setNavn(e.target.value)}
-                required
-              />
               <textarea
                 placeholder="Kommentar (valgfritt)"
                 value={kommentar}
                 onChange={(e) => setKommentar(e.target.value)}
               />
-              <button type="submit" disabled={saving}>
+              <button type="submit" disabled={saving || !sted.trim()}>
                 {saving ? "Lagrer..." : "Legg til"}
               </button>
             </form>
           )}
 
           {error && <p className="error-message">{error}</p>}
-
-          <h2>Ratings</h2>
-          <div className="rating-list">
-            {loading ? (
-              <p className="empty-state">Henter ratings...</p>
-            ) : Object.keys(grouped).length === 0 ? (
-              <p className="empty-state">Ingen ratings enda. Bli den første!</p>
-            ) : (
-              Object.entries(grouped).map(([personNavn, personRatings]) => (
-                <div key={personNavn} className="person-group">
-                  <h3 className="person-name">{personNavn}</h3>
-                  {personRatings
-                    .slice()
-                    .sort((a, b) => a.rank - b.rank)
-                    .map((rating) => (
-                      <RatingCard
-                        key={rating.id}
-                        rating={rating}
-                        position={rating.rank + 1}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                </div>
-              ))
-            )}
-          </div>
         </div>
       </section>
     </>

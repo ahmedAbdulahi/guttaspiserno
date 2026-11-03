@@ -74,8 +74,40 @@ h2 {
   margin-top: 3rem;
 }
 
-h2:first-of-type {
+/* Ratings står først; skjemaet ligger under lista */
+.container > h2:first-child {
   margin-top: 0;
+}
+
+/* Overskriften over skjemaet ligger i .section-header sammen med lås-knappen */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 3rem;
+  margin-bottom: 1.2rem;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.lock-btn {
+  background: none;
+  color: #777;
+  border: 1px solid #e0e0e0;
+  padding: 0.4rem 1rem;
+  min-height: 44px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.lock-btn:hover {
+  background: #f5f5f5;
+  color: #141414;
 }
 
 form {
@@ -145,6 +177,12 @@ button:hover {
   gap: 0.9rem;
 }
 
+@media (max-width: 520px) {
+  .compare-options {
+    flex-direction: column;
+  }
+}
+
 .compare-options button {
   flex: 1;
   background: #ffffff;
@@ -203,23 +241,6 @@ button:disabled {
   font-size: 1.1rem;
 }
 
-.person-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  margin-bottom: 1.5rem;
-}
-
-.person-group:last-child {
-  margin-bottom: 0;
-}
-
-.person-name {
-  font-size: 1rem;
-  font-weight: 700;
-  opacity: 0.6;
-}
-
 .rating-meta {
   font-size: 0.85rem;
   opacity: 0.55;
@@ -234,18 +255,84 @@ button:disabled {
 
 .delete-btn {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 0.4rem;
+  right: 0.4rem;
   background: none;
   border: none;
   color: #666;
   font-size: 1.1rem;
   cursor: pointer;
+  /* Krysset er lite, men treffområdet må være tommelvennlig */
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  width: auto;
 }
 
 .delete-btn:hover {
   color: #141414;
   background: none;
+}
+
+/* ---------- BEKREFT SLETTING ---------- */
+
+.dialog-bakgrunn {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 200;
+}
+
+.dialog {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.dialog-tittel {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+
+.dialog-tekst {
+  color: #666;
+  font-size: 0.95rem;
+  margin-bottom: 1.4rem;
+}
+
+.dialog-knapper {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.dialog-knapper button {
+  flex: 1;
+  min-height: 48px;
+}
+
+.dialog-avbryt {
+  background: #ffffff;
+  color: #141414;
+  border: 1px solid #ccc;
+}
+
+.dialog-avbryt:hover {
+  background: #f5f5f5;
+}
+
+.dialog-slett {
+  background: #c0392b;
+}
+
+.dialog-slett:hover {
+  background: #a93226;
 }
